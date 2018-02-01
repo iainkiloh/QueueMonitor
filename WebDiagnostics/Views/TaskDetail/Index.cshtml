@@ -1,0 +1,57 @@
+﻿@model WebDiagnostics.ViewModels.TaskMessageViewModel
+
+@{
+    ViewBag.Title = "Task Detail";
+}
+
+<script>
+    $(document).ready(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+</script>
+
+<h4>Task Detail</h4>
+
+<div class="container-fluid" style="margin-top: 25px">
+    <div class="media">
+        <div class="media-left">
+            <div class="glyphicon glyphicon-user"></div>
+        </div>
+        <div class="media-body">
+            <h4 class="media-heading">@Html.DisplayFor(m => m.UserDisplayName) <small><i>Ran Task on @Html.DisplayFor(m => m.MessageDate)</i></small></h4>
+            <dl class="dl-horizontal">
+                <dt>Outcome</dt>
+                <dd>
+                    @if (Model.Success)
+                    {
+                        @Html.Label("Success")
+                    }
+                    else
+                    {
+                        @Html.Label("Failure")
+                    }
+                </dd>
+                <dt>Message Content</dt>
+                <dd>@Html.DisplayFor(m => m.MessageContent)</dd>
+                @if (!Model.Success)
+                {
+                    <dt>Exception Info</dt>
+                    <dd>@Html.DisplayFor(m => m.ExceptionDetail)</dd>
+                }
+            </dl>
+        </div>
+
+    </div>
+
+    @if (!Model.Success)
+    {
+        <input type="submit" value="Resend To Queue" class="btn btn-toolbar my-tooltip" data-toggle="tooltip" data-placement="auto" title="Implementation coming in version 2" />
+    }
+
+</div>
+
+
+
+
+
+

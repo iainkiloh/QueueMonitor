@@ -1,0 +1,17 @@
+﻿@model IEnumerable<WebDiagnostics.ViewModels.TaskMessageViewModel>
+           
+@if (Model != null)
+{
+    foreach (var item in Model)
+    {
+        <tr class="@(@item.Success == false ? "danger" : "")">
+            <td class="hidden">@item.TaskMessageId</td>
+            <td>@item.MessageDate.ToString("dd-MM-yyyy HH:mm")</td>
+            <td>@item.Success</td>
+            <td>@item.UserDisplayName</td>
+            <td>@item.MessageContent</td>
+            <td>@Html.RouteLink("View", new { controller = "TaskDetail", action = "Index", id = item.TaskMessageId.ToString() }, new { @class = "btn btn-primary my-tooltip", data_toggle = "tooltip", data_placement = "auto", title = "Click to view more details", target = "_blank" })</td>
+            <td class="hidden">@item.ExceptionDetail</td>
+        </tr>
+    }
+}

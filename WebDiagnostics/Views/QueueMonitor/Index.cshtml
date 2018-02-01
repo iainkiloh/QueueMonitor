@@ -1,0 +1,456 @@
+﻿@using WebDiagnostics.Infrastructure
+@model WebDiagnostics.ViewModels.TaskViewModel
+
+@{
+    ViewBag.Title = "Queue Monitor";
+    AjaxOptions filterOpts = new AjaxOptions()
+    {
+        OnSuccess = "processFilteredResults",
+        OnFailure = "processError"
+    };
+}
+
+<script>
+
+    $(document).ready(function () {
+        $("#StartDate").datepicker({
+            dateFormat: "dd-mm-yy"
+        }); 
+
+        $("#EndDate").datepicker({
+            dateFormat: "dd-mm-yy"
+        });
+
+        $(".paging-button").click(function () {
+            pagingLinkClick(this);
+        });
+
+        $('#PageSize').on('change', function () {
+            var pageSize = this.value;
+            //alert(this.value);
+            $("#PagingInfo_ItemsPerPage").val(pageSize);
+            PostFilter();
+        });
+
+        $(".sortable-header").click(function () {
+
+            //is the click from the the element of the icon itself?
+            var controlId = $(this).attr('sortcontrol-id');
+
+            //get the OrderByProperty Property
+            var orderByProperty = $('#' + controlId).attr('data-val');
+
+            //get the OrderByDescending Property
+            var orderByDescending = $('#' + controlId).attr('data-dir');
+
+            if (orderByDescending == 'Up') {
+                $('#PagingInfo_OrderByDescending').val(true);
+                $('#' + controlId).attr('data-dir', 'Down');
+                $('#' + controlId).removeClass('glyphicon glyphicon-triangle-top');
+                $('#' + controlId).addClass('glyphicon glyphicon-triangle-bottom');
+
+            } else {
+                $('#PagingInfo_OrderByDescending').val(false);
+                $('#' + controlId).attr('data-dir', 'Up');
+                $('#' + controlId).removeClass('glyphicon glyphicon-triangle-bottom');
+                $('#' + controlId).addClass('glyphicon glyphicon-triangle-top');
+            }
+
+            //reset the rest (sortable items that were not selected) to default arrow direction of ascending
+            $(".sort-button:not(#" + controlId + ")").attr('data-dir', 'Up');
+            $(".sort-button:not(#" + controlId + ")").removeClass('glyphicon glyphicon-triangle-bottom');
+            $(".sort-button:not(#" + controlId + ")").addClass('glyphicon glyphicon-triangle-top');
+
+            //set the OrderByProperty in the form
+            $('#PagingInfo_OrderByProperty').val(orderByProperty);
+
+            //construct the post data from the form
+            //get the PagingInfo from the form
+            var paginginfo = {
+                StartDate: $('#PagingInfo_StartDate').val(),
+                EndDate: $('#PagingInfo_EndDate').val(),
+                OrderByDescending: $('#PagingInfo_OrderByDescending').val(),
+                OrderByProperty: $('#PagingInfo_OrderByProperty').val(),
+                TotalPages: $('#PagingInfo_TotalPages').val(),
+                TotalItems: $('#PagingInfo_TotalItems').val(),
+                ItemsPerPage: $('#PagingInfo_ItemsPerPage').val()
+            }
+            //get the view model data from the form
+            var viewmodeldata = {
+                PagingInfo: paginginfo,
+                StartDate: $('#StartDate').val(),
+                EndDate: $('#EndDate').val(),
+                SelectedStatus: $('#SelectedStatus').val()
+            }
+
+            //call the action method GetTaskMessageDataJson
+            $.ajax({
+                url: '/QueueMonitor/GetTaskMessageDataJson',
+                type: "POST",
+                data: viewmodeldata,
+                success: processFilteredResults
+            });
+        });
+
+        $('[data-toggle="tooltip"]').tooltip();
+
+        //swap in the jquery validation for our date format
+        $.validator.addMethod('date', function (value, element) {
+            try {
+                return value.match(/^\d\d?\-\d\d?\-\d\d\d\d$/);
+            }
+            catch (err) {
+                return false;
+            }
+        });
+
+        //allow specific fields to not particiapte in the unobtrusive validation
+        $(function () {
+            var settngs = $.data($('form')[0], 'validator').settings;
+            settngs.ignore = ".ignore";
+        });
+
+    });
+
+    function PostFilter() {
+
+        //construct the post data from the form
+        //get the PagingInfo from the form
+        var paginginfo = {
+            StartDate: $('#PagingInfo_StartDate').val(),
+            EndDate: $('#PagingInfo_EndDate').val(),
+            OrderByDescending: $('#PagingInfo_OrderByDescending').val(),
+            OrderByProperty: $('#PagingInfo_OrderByProperty').val(),
+            TotalPages: $('#PagingInfo_TotalPages').val(),
+            TotalItems: $('#PagingInfo_TotalItems').val(),
+            ItemsPerPage: $('#PagingInfo_ItemsPerPage').val()
+        }
+        //get the view model data from the form
+        var viewmodeldata = {
+            PagingInfo: paginginfo,
+            StartDate: $('#StartDate').val(),
+            EndDate: $('#EndDate').val(),
+            SelectedStatus: $('#SelectedStatus').val()
+        }
+
+        //call the action method GetTaskMessageDataJson
+        $.ajax({
+            url: '/QueueMonitor/GetTaskMessageDataJson',
+            type: "POST",
+            data: viewmodeldata,
+            success: processFilteredResults
+        });
+    }
+
+
+    function pagingLinkClick(control) {
+
+        var pagenumber = $(control).attr('pagenumber');
+        
+        //get the PagingInfo from the form into an object for posting
+        var paginginfo = {
+            StartDate: $('#PagingInfo_StartDate').val(),
+            EndDate: $('#PagingInfo_EndDate').val(),
+            TotalPages: $('#PagingInfo_TotalPages').val(),
+            TotalItems: $('#PagingInfo_TotalItems').val(),
+            ItemsPerPage: $('#PagingInfo_ItemsPerPage').val(),
+            OrderByDescending: $('#PagingInfo_OrderByDescending').val(),
+            OrderByProperty: $('#PagingInfo_OrderByProperty').val(),
+            SelectedStatus: $('#PagingInfo_SelectedStatus').val(),
+            CurrentPage: pagenumber
+        }
+
+        //set the pagenumber attribute for the NEXT page link
+        var nextNumber = +paginginfo.CurrentPage + +1;
+        if (nextNumber > +paginginfo.TotalPages) {
+            nextNumber = +paginginfo.TotalPages;
+        }
+        $('#btnPageLinkNext').attr('pagenumber', nextNumber);
+
+        //set the pagenumber attribute for the PREVIOUS page link
+        var previousNumber = +paginginfo.CurrentPage - +1;
+        if (previousNumber < +1) {
+            previousNumber = +1;
+        }
+        $('#btnPageLinkPrevious').attr('pagenumber', previousNumber);
+
+        //do the POST
+        $.ajax({
+            url: '/QueueMonitor/PageDataJson',
+            type: "POST",
+            data: paginginfo,
+            success: processMessageTable
+        });
+
+        updatePageDisplay(paginginfo);
+
+    }
+
+    //processes the response from a filter change
+    function processFilteredResults(data) {
+        clearErrorMessages();
+        //process the message table rows
+        processMessageTable(data.TaskMessages);
+
+        //sets the statictics labels
+        $('#totalMessageCount').empty().html('Total Messages: ' + data.Statistics.TotalMessages);
+        $('#successfulMessageCount').empty().html('Successful Messages: ' + data.Statistics.Success);
+        $('#failedMessageCount').empty().html('Failed Messages: ' + data.Statistics.Failures);
+        $('#summaryDateRange').empty().html('from: ' + data.StartDateText + " to " + data.EndDateText);
+        $('#completedTaskRange').empty().html('between: ' + data.StartDateText + " to " + data.EndDateText + ", Status: " + data.SelectedStatusString);
+        $('#totalRecords').empty().html('Total Records: ' + data.PagingInfo.TotalItems);
+
+        //maintains the paging info to reflect the filtered data response
+        $('#PagingInfo_SelectedStatus').val(data.PagingInfo.SelectedStatus);
+        $('#PagingInfo_CurrentPage').val(data.PagingInfo.CurrentPage);
+        $('#PagingInfo_ItemsPerPage').val(data.PagingInfo.ItemsPerPage);
+        $('#PagingInfo_OrderByProperty').val(data.PagingInfo.OrderByProperty);
+        $('#PagingInfo_OrderByDescending').val(data.PagingInfo.OrderByDescending);
+        $('#PagingInfo_TotalItems').val(data.PagingInfo.TotalItems);
+        $('#PagingInfo_TotalPages').val(data.PagingInfo.TotalPages);
+        $('#PagingInfo_StartDate').val(data.StartDateText);
+        $('#PagingInfo_EndDate').val(data.EndDateText);
+
+        reloadPagingLinks(data.PagingInfo);
+
+        updatePageDisplay(data.PagingInfo);
+
+        $('[data-toggle="tooltip"]').tooltip();
+
+       
+
+    }
+
+    function reloadPagingLinks(data) {
+
+        //reload the PagingLinks content to reflect the filtered data response
+        $.ajax({
+            url: '/QueueMonitor/PageLinks',
+            type: 'POST',
+            data: { data: data },
+            success: function (linksHtml) {
+                //reload the content
+                $('#pagingLinks').html(linksHtml);
+                //re-hook up the click event, to get the paged data
+                $(".paging-button").click(function () {
+                    pagingLinkClick(this);
+                }
+                );
+
+                $('#PageSize').on('change', function () {
+                    var pageSize = this.value;
+                    $("#PagingInfo_ItemsPerPage").val(pageSize);
+                    PostFilter();
+                });
+            }
+        });
+
+    }
+
+    function processMessageTable(data) {
+        //clear the TaskMEssage data table and add the fresh data
+        var target = $("#tableBody");
+        target.empty();
+        var messages = data;
+        for (var i = 0; i < messages.length; i++) {
+            var message = messages[i];
+
+            var appendString = "<tr";
+            if (message.Success == false) {
+                appendString = appendString + " class = 'danger'";
+            }
+
+            appendString = appendString + "><td class='hidden'>" + message.TaskMessageId + "</td>"
+                + "<td>" + message.MessageDateText + "</td>"
+                + "<td>" + message.Success + "</td>"
+                + "<td>" + message.UserDisplayName + "</td>"
+                + "<td>" + message.MessageContent + "</td>";
+
+            var linkItemString = "<td><a target='_blank' class='btn btn-primary my-tooltip' data-placement='auto' data-toggle='tooltip' data-original-title='Click to view more details' title='' href='/TaskDetail/Index/" + message.TaskMessageId + "'>View</a>" + "</td>";
+            appendString = appendString + linkItemString + "</tr>";
+            target.append(appendString);
+
+         
+            
+
+        }
+    }
+
+    //clear validation summary
+    function clearErrorMessages() {
+        $('.validation-summary-errors').addClass('validation-summary-valid');
+        $('.validation-summary-valid').removeClass('validation-summary-errors');
+    }
+
+    function updatePageDisplay(data) {
+        $('#pageDisplay').text('Page ' + data.CurrentPage + ' of ' + data.TotalPages);
+    }
+
+    //process POST call response errors
+    function processError(x) {
+
+        var response = null;
+        var errorsString = "";
+        var intStatus = parseInt(x.status);
+        var int400error = parseInt("400");
+
+
+        //WE IGNORE MODEL STATE EXTRACTION IF THERE WAS SOME OTHER UNEXPECTED ERROR (I.E. NOT A VALIDATION ERROR)
+        if (intStatus == int400error) {//SINCE WE ARE RETURNING BAD REQUEST STATUS FROM OUR  API, SO WE CHECK IF STATUS CODE IS 400
+            try {
+                //alert(x.responseText);
+                response = JSON.parse(x.responseText);
+            }
+            catch (e) { //this is not sending us a ModelState, else we would get a good responseText JSON to parse)
+                alert('a site error ' + x.status + ' has occurred, please contact your site administrator');
+            }
+        }
+
+        var errorsString = "<ul>";
+        if (response != null) {
+            var modelErrors = response;
+            for (var i = 0; i < modelErrors.length; i++) {
+                errorsString = errorsString + "<li>" + modelErrors[i].ErrorMessage + "</li>";
+            }
+
+            errorsString = errorsString + "</ul>";
+            $(".json-error").addClass('validation-summary-errors').removeClass('validation-summary-valid').html(errorsString);
+
+        }
+    }
+
+</script>
+
+@using (Ajax.BeginForm("GetTaskMessageDataJson", filterOpts))
+{
+    <div class="container-fluid" style="margin-top: 15px; border: 1px solid lightgray;">
+        <div class="row" style="margin: 5px 5px 5px 5px;">
+            <div class="col-sm-12">
+                <h4>Filters</h4>
+            </div>
+            <div class="col-sm-12">
+                @Html.ValidationSummary(null, new { @class = "json-error" })
+            </div>
+        </div>
+        <div class="form-group col-sm-3">
+            <label for="StartDate">From</label>
+            <div class="input-group">
+                @Html.TextBoxFor(m => m.StartDate, new { @class = "form-control" })
+                <span class="input-group-addon">
+                    <span class="glyphicon glyphicon-calendar"></span>
+                </span>
+            </div>
+        </div>
+        <div class="form-group col-sm-3">
+            <label for="EndDate">To</label>
+            <div class="input-group">
+                @Html.TextBoxFor(m => m.EndDate, new { @class = "form-control" })
+                <span class="input-group-addon">
+                    <span class="glyphicon glyphicon-calendar"></span>
+                </span>
+            </div>
+        </div>
+        <div class="form-group col-sm-3">
+            <label for="SelectedStatus">Status</label>
+            @Html.DropDownListFor(m => m.SelectedStatus, Model.StatusOptions.ToSelectList(), new { @class = "form-control" })
+        </div>
+        <div class="form-group col-sm-3">
+            <label for="inputDoFilter"></label>
+            <input type="submit" value="Apply Filters" id="inputDoFilter" class="btn btn-primary form-control" />
+        </div>
+    </div>
+    <div>
+        @Html.HiddenFor(m => m.PagingInfo.SelectedStatus)
+        @Html.HiddenFor(m => m.PagingInfo.StartDate, new { @class = "ignore" })
+        @Html.HiddenFor(m => m.PagingInfo.EndDate, new { @class = "ignore" })
+        @Html.HiddenFor(m => m.PagingInfo.CurrentPage)
+        @Html.HiddenFor(m => m.PagingInfo.ItemsPerPage)
+        @Html.HiddenFor(m => m.PagingInfo.OrderByProperty)
+        @Html.HiddenFor(m => m.PagingInfo.OrderByDescending)
+        @Html.HiddenFor(m => m.PagingInfo.TotalItems)
+        @Html.HiddenFor(m => m.PagingInfo.TotalPages)
+
+    </div>
+}
+
+<div class="container-fluid" style="margin-top: 10px;">
+    <div class="row">
+        <h4>Tasks Summary <small id="summaryDateRange">from: @Model.StartDateText to @Model.EndDateText</small></h4>
+    </div>
+    <div class="row form-inline" style="border: 1px solid lightgray;">
+        <div class="form-group col-sm-4" id="totalMessageCount">
+            Total Messages: @Html.DisplayFor(m => m.Statistics.TotalMessages)
+        </div>
+        <div class="form-group col-sm-4" id="successfulMessageCount">
+            Successful Messages: @Html.DisplayFor(m => m.Statistics.Success)
+        </div>
+        <div class="form-group col-sm-4" id="failedMessageCount">
+            Failed Messages: @Html.DisplayFor(m => m.Statistics.Failures)
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid" style="margin-top: 10px">
+
+    <div class="row">
+        <h4>Completed Tasks <small id="completedTaskRange">between: @Model.StartDateText and @Model.EndDateText, Status: (@Model.SelectedStatus)</small></h4>
+    </div>
+    <div class="row">
+        <div class="table-response">
+            <table class="table table-striped table-condensed table-bordered table-hover col-sm-12">
+                <thead>
+                <tr>
+                    <th class="hidden">Id</th>
+                    <th>
+                        <div class="th-inner sortable-header both desc input-group" sortcontrol-id="btnSortDate">
+                            Date (GMT)
+                            <span class=" input-group-addon white-background" style="border: none">
+                                <span class="glyphicon glyphicon-triangle-bottom white-background sort-button" data-dir="Down" data-val="MessageDate" data-id="btnSortDate" id="btnSortDate"></span>
+                            </span>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="th-inner sortable-header both desc input-group" sortcontrol-id="btnSortStatus">
+                            Success
+                            <span class="input-group-addon white-background" style="border: none"><span class="glyphicon glyphicon-triangle-top white-background sort-button" data-dir="Up" data-val="Success" id="btnSortStatus"></span></span>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="th-inner sortable-header both desc input-group" sortcontrol-id="btnSortUser">
+                            User
+                            <span class="input-group-addon white-background" style="border: none"><span class="glyphicon glyphicon-triangle-top white-background sort-button" data-dir="Up" data-val="User.Username" id="btnSortUser"></span></span>
+                        </div>
+                    </th>
+                    <th>Message</th>
+                    <th class="hidden">Exception</th>
+                    <th>Detail</th>
+                </tr>
+                </thead>
+                <tbody id="tableBody">
+                @Html.Action("GetTaskMessageData", new {data = Model})
+                </tbody>
+            </table>
+        </div>
+        </div>
+</div>
+
+<div class="container-fluid">
+<div class="row">
+    <div class="pull-left">
+       <label id="pageDisplay" style="font-weight: normal;">Page @Model.PagingInfo.CurrentPage of @Model.PagingInfo.TotalPages</label>
+    </div>
+    @{ Html.RenderPartial("PageLinks", Model.PagingInfo); }
+
+</div>
+</div>
+
+
+<div class="container-fluid">
+    <div class="row" id="totalRecords">
+        Total Records:
+        @Html.DisplayFor(m => m.PagingInfo.TotalItems)
+    </div>
+</div>
+
+
+

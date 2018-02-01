@@ -1,0 +1,15 @@
+﻿@using WebDiagnostics.Infrastructure.HtmlHelpers
+@model WebDiagnostics.ViewModels.PagingInfo
+           
+@if (Model != null)
+{
+    <div class="btn-group pull-right" id="pagingLinks" style="border: solid 1px lightgray;">
+
+        @Html.PageLinks(Model)
+
+    </div>
+}
+
+
+           
+
